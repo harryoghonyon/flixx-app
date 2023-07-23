@@ -1,5 +1,17 @@
 const global = {
   currentPage: window.location.pathname,
+  search: {
+    term: "",
+    type: "",
+    term: "",
+    page: 1,
+    totalPages: 1,
+    totalResults: 0,
+  },
+  api: {
+    apiKey: "a24b2ac9606b848bb9e2327651bb9912",
+    apiUrl: "https://api.themoviedb.org/3/",
+  },
 };
 
 // Display popular movies on home
@@ -169,6 +181,89 @@ const showDetails = async () => {
   document.querySelector("#show-details").appendChild(div);
 };
 
+// Function to handle searched movies
+
+const search = async () => {
+  const queryString = window.location.search;
+  const urlParams = new URLSearchParams(queryString);
+
+  global.search.type = urlParams.get("type");
+  global.search.term = urlParams.get("search-term"); // Fix the typo here
+
+  if (global.search.term && global.search.term.trim() !== "") {
+    const { results, total_pages, page, total_results } = await searchAPIData();
+
+    global.search.page = page;
+    global.search.totalPages = total_pages;
+    global.search.totalResults = total_results;
+    if (results.length === 0) {
+      showAlert("No results found");
+      return;
+    }
+
+    displaySearchResults(results);
+
+    document.querySelector("#search-term").value = "";
+  } else {
+    showAlert("Please enter a search keyword");
+  }
+};
+
+// Function to add search results to DOM
+
+const displaySearchResults = (results) => {
+  results.forEach((result) => {
+    const div = document.createElement("div");
+    div.classList.add("card");
+    div.innerHTML = `
+          <a href="${global.search.type}-details.html?${result.id}">
+            ${
+              result.poster_path
+                ? `<img src="https://image.tmdb.org/t/p/w500/${
+                    result.poster_path
+                  }" class="card-img-top" alt="${
+                    global.search.type === "movie" ? result.title : result.name
+                  }" />`
+                : `<img src="images/no-image.jpg" class="card-img-top" alt="${
+                    global.search.type === "movie" ? result.title : result.name
+                  }" />`
+            }
+          </a>
+          <div class="card-body">
+            <h5 class="card-title">${
+              global.search.type === "movie" ? result.title : result.name
+            }</h5>
+            <p class="card-text">
+              <small class="text-muted">Release: ${
+                global.search.type === "movie"
+                  ? result.release_date
+                  : result.first_air_date
+              }</small>
+            </p>
+          </div>
+        `;
+
+    document.querySelector(
+      "#search-results-heading"
+    ).innerHTML = `<h2>${results.length} of ${global.search.totalResults} for the ${global.search.term}</h2>`;
+
+    document.querySelector("#search-results").appendChild(div);
+  });
+};
+
+// Show search term alaert prompt
+
+const showAlert = (message, className = "error") => {
+  const alertEl = document.createElement("div");
+  alertEl.classList.add("alert", className);
+  alertEl.appendChild(document.createTextNode(message));
+  document.querySelector("#alert").appendChild(alertEl);
+
+  setTimeout(() => alertEl.remove(), 3000);
+};
+
+// Display now playing movies slider
+
 const displaySlider = async () => {
   const { results } = await fetchAPIData("movie/now_playing");
 
@@ -247,13 +342,32 @@ const hideSpinner = () => {
 // Fetch data from TMBD API
 
 const fetchAPIData = async (endpoint) => {
-  const API_KEY = "a24b2ac9606b848bb9e2327651bb9912";
-  const API_URL = "https://api.themoviedb.org/3/";
+  const API_KEY = global.api.apiKey;
+  const API_URL = global.api.apiUrl;
 
   showSpinner();
 
   const response = await fetch(
     `${API_URL}${endpoint}?api_key=${API_KEY}&languagr=en-US`
+  );
+
+  const data = await response.json();
+
+  hideSpinner();
+
+  return data;
+};
+
+// Make search request
+
+const searchAPIData = async () => {
+  const API_KEY = global.api.apiKey;
+  const API_URL = global.api.apiUrl;
+
+  showSpinner();
+
+  const response = await fetch(
+    `${API_URL}search/${global.search.type}?api_key=${API_KEY}&languagr=en-US&query=${global.search.term}`
   );
 
   const data = await response.json();
@@ -287,7 +401,7 @@ const init = () => {
       movieDetails();
       break;
     case "/search.html":
-      console.log("Search page");
+      search();
       break;
     case "/shows.html":
       displayPopularShows();
